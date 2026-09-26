@@ -4,8 +4,8 @@ A versioned external copy of ESPHome's `mipi_rgb` component with additional
 configuration for RGB panels that need larger DMA bounce buffers or control over
 ESP-IDF's per-frame restart behavior.
 
-The current component is based on ESPHome 2026.7.4. Production configurations
-should use an immutable release tag rather than `main` or a maintenance branch.
+This branch is based on ESPHome 2026.9.0. Production configurations should use
+an immutable release tag rather than `main` or a maintenance branch.
 
 ## Usage
 
@@ -14,7 +14,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/aclight/esphome-mipi-rgb.git
-      ref: esphome-2026.7.4-r1
+      ref: esphome-2026.9.0-r1
       path: components
     components: [mipi_rgb]
     refresh: 0s
@@ -29,9 +29,9 @@ the configuration.
 - `bounce_buffer_lines` controls the number of scanlines in each of ESP-IDF's
   two internal-SRAM bounce buffers. It defaults to ESPHome's stock value of 10
   and must divide the display height exactly.
-- `force_restart` controls the upstream per-loop
+- `force_restart` controls the upstream S3-only per-loop
   `esp_lcd_rgb_panel_restart()` call. It defaults to `true`, preserving upstream
-  behavior.
+  behavior. ESPHome 2026.9.0 does not make that call on P4 or S31.
 - `desync_report_interval` enables optional VSYNC and frame-completion
   instrumentation. It defaults to `0s`, which disables the instrumentation.
 - `late_frame_threshold` sets the interrupt-latency threshold used by that

@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2019 ESPHome
 #
-# Modified copy of esphome/components/mipi_rgb/display.py from ESPHome 2026.7.4.
-# Change vs upstream: adds the bounce_buffer_lines option.
+# Modified copy of esphome/components/mipi_rgb/display.py from ESPHome 2026.9.0.
+# Changes vs upstream: configurable bounce buffers, S3 restart control, and
+# optional VSYNC/frame-completion diagnostics.
 
 import importlib
 import pkgutil
+from typing import Any
 
 from esphome import pins
 import esphome.codegen as cg
@@ -17,7 +19,12 @@ from esphome.components.const import (
     CONF_DRAW_ROUNDING,
 )
 from esphome.components.display import CONF_SHOW_TEST_CARD
-from esphome.components.esp32 import VARIANT_ESP32P4, VARIANT_ESP32S3, only_on_variant
+from esphome.components.esp32 import (
+    VARIANT_ESP32P4,
+    VARIANT_ESP32S3,
+    VARIANT_ESP32S31,
+    only_on_variant,
+)
 from esphome.components.mipi import (
     COLOR_ORDERS,
     CONF_DE_PIN,
@@ -78,27 +85,17 @@ from esphome.const import (
     CONF_WIDTH,
 )
 from esphome.final_validate import full_config
+from esphome.types import ConfigType
 
 from . import models
 from .models import RgbDriverChip
 
 DEPENDENCIES = ["esp32"]
 
-# Number of scanlines per bounce buffer. Two buffers of this size are allocated
-# in internal SRAM; the stock component hardcodes 10.
+# Two internal-SRAM buffers of this many scanlines feed the display DMA.
 CONF_BOUNCE_BUFFER_LINES = "bounce_buffer_lines"
-
-# Stock calls esp_lcd_rgb_panel_restart() every loop, which makes ESP-IDF reset
-# the DMA on every VSYNC; IDF's own comment says that can itself cause
-# single-frame desyncs. Set false to restart only on a detected underrun.
 CONF_FORCE_RESTART = "force_restart"
-
-# Interval for logging the VSYNC vs frame-complete drift. 0s disables the
-# counters entirely (no callbacks registered).
 CONF_DESYNC_REPORT_INTERVAL = "desync_report_interval"
-
-# How far past the nominal frame period a VSYNC callback must land to be logged
-# as a late frame.
 CONF_LATE_FRAME_THRESHOLD = "late_frame_threshold"
 
 mipi_rgb_ns = cg.esphome_ns.namespace("mipi_rgb")
@@ -120,7 +117,7 @@ for module_info in pkgutil.iter_modules(models.__path__):
 MODELS = DriverChip.get_models()
 
 
-def data_pin_validate(value):
+def data_pin_validate(value: Any) -> ConfigType:
     """
     It is safe to use strapping pins as RGB output data bits, as they are outputs only,
     and not initialised until after boot.
@@ -135,14 +132,14 @@ def data_pin_validate(value):
     return DATA_PIN_SCHEMA(value)
 
 
-def data_pin_set(length):
+def data_pin_set(length: int) -> cv.All:
     return cv.All(
         [data_pin_validate],
         cv.Length(min=length, max=length, msg=f"Exactly {length} data pins required"),
     )
 
 
-def model_schema(config):
+def model_schema(config: ConfigType) -> cv.Schema:
     model = MODELS[config[CONF_MODEL].upper()]
     transform = model.transform_schema()
     # RPI model does not use an init sequence, indicates with empty list
@@ -244,7 +241,7 @@ def model_schema(config):
 
 
 @model_schema_extractor(MODELS, model_schema)
-def _config_schema(config):
+def _config_schema(config: ConfigType) -> ConfigType:
     config = cv.Schema(
         {
             cv.Required(CONF_MODEL): cv.one_of(*MODELS, upper=True),
@@ -255,7 +252,7 @@ def _config_schema(config):
     config = cv.All(
         schema,
         cv.only_on_esp32,
-        only_on_variant(supported=[VARIANT_ESP32S3, VARIANT_ESP32P4]),
+        only_on_variant(supported=[VARIANT_ESP32S3, VARIANT_ESP32P4, VARIANT_ESP32S31]),
     )(config)
     model = MODELS[config[CONF_MODEL].upper()]
     model.check_requirements()
@@ -286,7 +283,7 @@ def _config_schema(config):
 CONFIG_SCHEMA = _config_schema
 
 
-def _final_validate(config):
+def _final_validate(config: ConfigType) -> None:
     global_config = full_config.get()
 
     from esphome.components.lvgl import DOMAIN as LVGL_DOMAIN
@@ -298,13 +295,12 @@ def _final_validate(config):
         config = spi.final_validate_device_schema(
             "mipi_rgb", require_miso=False, require_mosi=True
         )(config)
-    return config
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
 
 
-async def to_code(config):
+async def to_code(config: ConfigType) -> None:
     model = MODELS[config[CONF_MODEL].upper()]
     width, height, _offset_width, _offset_height, _pad_width, _pad_height = (
         model.get_dimensions(config)

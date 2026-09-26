@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2019 ESPHome
 //
-// Modified copy of esphome/components/mipi_rgb/mipi_rgb.h from ESPHome 2026.7.4.
-// Changes vs upstream: configurable bounce_buffer_lines, an opt-out for the
-// per-loop esp_lcd_rgb_panel_restart() call, and VSYNC/frame-complete counters
-// used to measure DMA desyncs.
+// Modified copy of esphome/components/mipi_rgb/mipi_rgb.h from ESPHome 2026.9.0.
 // See LICENSES/ESPHome-LICENSE.txt and components/mipi_rgb/LICENSE.
 
 #pragma once
 
-#if defined(USE_ESP32_VARIANT_ESP32S3) || defined(USE_ESP32_VARIANT_ESP32P4)
+#if defined(USE_ESP32_VARIANT_ESP32S3) || defined(USE_ESP32_VARIANT_ESP32P4) || defined(USE_ESP32_VARIANT_ESP32S31)
 #include <atomic>
 #include <cstdint>
 #include "esphome/core/gpio.h"
 #include "esphome/components/display/display.h"
-#include "esp_lcd_panel_ops.h"
-#include "esp_lcd_panel_rgb.h"
+#include <esp_lcd_panel_rgb.h>
 #ifdef USE_SPI
 #include "esphome/components/spi/spi.h"
 #endif
@@ -87,16 +83,11 @@ class MipiRgb : public display::Display {
   void report_desync_();
   void drain_late_frames_();
 
-  // Both fire once per frame: on_vsync from the hardware VSYNC_END interrupt,
-  // on_frame_buf_complete when the driver's software bounce position wraps.
-  // Any divergence between the two counts is a DMA desync.
+  // These callbacks run in separate interrupt contexts and fire once per frame.
   static bool vsync_cb_(esp_lcd_panel_handle_t panel, const esp_lcd_rgb_panel_event_data_t *edata, void *user_ctx);
   static bool frame_complete_cb_(esp_lcd_panel_handle_t panel, const esp_lcd_rgb_panel_event_data_t *edata,
                                  void *user_ctx);
 
-  // Hardware VSYNC is exactly periodic, so jitter in the timestamp taken inside
-  // the callback is interrupt latency - the condition ESP-IDF blames for the
-  // single-frame shift its own DMA restart can cause.
   struct LateFrame {
     uint32_t interval_us;
     uint32_t slack_us;
@@ -112,9 +103,7 @@ class MipiRgb : public display::Display {
   std::atomic<uint8_t> late_write_{0};
   std::atomic<uint8_t> late_read_{0};
   LateFrame late_events_[LATE_EVENT_SLOTS]{};
-  // on_frame_buf_complete runs in the GDMA ISR and on_vsync in the LCD ISR, so
-  // these are cross-ISR and must stay 32-bit to avoid torn reads. Microsecond
-  // wraparound every ~71min is harmless for deltas.
+  // Keep cross-ISR timestamps 32-bit to prevent torn reads on 32-bit targets.
   std::atomic<uint32_t> last_vsync_us_{0};
   std::atomic<uint32_t> last_fb_complete_us_{0};
   std::atomic<uint32_t> bogus_interval_count_{0};
@@ -141,7 +130,7 @@ class MipiRgb : public display::Display {
   uint16_t vsync_back_porch_ = 10;
   uint16_t vsync_front_porch_ = 10;
   uint32_t pclk_frequency_ = 16 * 1000 * 1000;
-  // Scanlines per bounce buffer; two of these are allocated in internal SRAM.
+  // Two buffers of this size are allocated in internal SRAM.
   uint16_t bounce_buffer_lines_{10};
   bool pclk_inverted_{true};
   const char *model_{"Unknown"};

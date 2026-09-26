@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2019 ESPHome
 //
-// Modified copy of esphome/components/mipi_rgb/mipi_rgb.cpp from ESPHome 2026.7.4.
-// Changes vs upstream: configurable bounce_buffer_lines, an opt-out for the
-// per-loop esp_lcd_rgb_panel_restart() call, and VSYNC/frame-complete counters
-// used to measure DMA desyncs.
+// Modified copy of esphome/components/mipi_rgb/mipi_rgb.cpp from ESPHome 2026.9.0.
 // See LICENSES/ESPHome-LICENSE.txt and components/mipi_rgb/LICENSE.
 
-#if defined(USE_ESP32_VARIANT_ESP32S3) || defined(USE_ESP32_VARIANT_ESP32P4)
+#if defined(USE_ESP32_VARIANT_ESP32S3) || defined(USE_ESP32_VARIANT_ESP32P4) || defined(USE_ESP32_VARIANT_ESP32S31)
 #include "mipi_rgb.h"
 #include "esphome/core/gpio.h"
 #include "esphome/core/hal.h"
@@ -15,7 +12,7 @@
 #include "esphome/core/log.h"
 #include <cinttypes>
 #include <driver/gpio.h>
-#include <esp_lcd_panel_rgb.h>
+#include <esp_lcd_panel_ops.h>
 #include <esp_timer.h>
 #include <span>
 
@@ -224,8 +221,7 @@ bool IRAM_ATTR MipiRgb::vsync_cb_(esp_lcd_panel_handle_t /*panel*/,
   if (interval > self->max_interval_us_.load(std::memory_order_relaxed)) {
     self->max_interval_us_.store(interval, std::memory_order_relaxed);
   }
-  // The scanout is still ~2 bounce buffers ahead here, so this is the margin
-  // left at the end of the frame rather than the whole frame period.
+  // The scanout is still about two bounce buffers ahead at VSYNC.
   uint32_t slack = 0;
   const uint32_t fb_complete = self->last_fb_complete_us_.load(std::memory_order_relaxed);
   if (fb_complete != 0) {
@@ -297,10 +293,14 @@ void MipiRgb::report_desync_() {
 }
 
 void MipiRgb::loop() {
-  if (this->handle_ == nullptr)
+  if (this->handle_ == nullptr) {
     return;
-  if (this->force_restart_)
+  }
+#ifdef USE_ESP32_VARIANT_ESP32S3
+  if (this->force_restart_) {
     esp_lcd_rgb_panel_restart(this->handle_);
+  }
+#endif
   if (this->desync_report_interval_ != 0) {
     this->drain_late_frames_();
     const uint32_t now = millis();
@@ -372,8 +372,9 @@ void MipiRgb::write_to_display_(int x_start, int y_start, int w, int h, const ui
       ptr += stride;  // next line
     }
   }
-  if (err != ESP_OK)
+  if (err != ESP_OK) {
     ESP_LOGE(TAG, "lcd_lcd_panel_draw_bitmap failed: %s", esp_err_to_name(err));
+  }
 }
 
 bool MipiRgb::check_buffer_() {
@@ -474,7 +475,7 @@ int MipiRgb::get_height() {
   }
 }
 
-static const char *get_pin_name(GPIOPin *pin, std::span<char, GPIO_SUMMARY_MAX_LEN> buffer) {
+[[maybe_unused]] static const char *get_pin_name(GPIOPin *pin, std::span<char, GPIO_SUMMARY_MAX_LEN> buffer) {
   if (pin == nullptr)
     return "None";
   pin->dump_summary(buffer.data(), buffer.size());
@@ -511,7 +512,7 @@ void MipiRgb::dump_config() {
                 "\n  Invert Colors: %s"
                 "\n  Pixel Clock: %uMHz"
                 "\n  Bounce Buffer Lines: %u"
-                "\n  Force Restart: %s"
+                "\n  Force Restart (S3): %s"
                 "\n  Reset Pin: %s"
                 "\n  DE Pin: %s"
                 "\n  PCLK Pin: %s"
@@ -532,4 +533,5 @@ void MipiRgb::dump_config() {
 }
 
 }  // namespace esphome::mipi_rgb
-#endif  // defined(USE_ESP32_VARIANT_ESP32S3) || defined(USE_ESP32_VARIANT_ESP32P4)
+#endif  // defined(USE_ESP32_VARIANT_ESP32S3) || defined(USE_ESP32_VARIANT_ESP32P4) ||
+        // defined(USE_ESP32_VARIANT_ESP32S31)
