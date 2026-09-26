@@ -1,8 +1,7 @@
 # ESPHome MIPI RGB
 
-A versioned external copy of ESPHome's `mipi_rgb` component with additional
-configuration for RGB panels that need larger DMA bounce buffers or control over
-ESP-IDF's per-frame restart behavior.
+Versioned external copies of ESPHome components used by the alarm clock and
+Memeboard control panel.
 
 This branch is based on ESPHome 2026.9.0. Production configurations should use
 an immutable release tag rather than `main` or a maintenance branch.
@@ -14,15 +13,16 @@ external_components:
   - source:
       type: git
       url: https://github.com/aclight/esphome-mipi-rgb.git
-      ref: esphome-2026.9.0-r1
+      ref: esphome-2026.9.0-r2
       path: components
-    components: [mipi_rgb]
+    components: [mipi_rgb, runtime_image]
     refresh: 0s
 ```
 
-The external component shadows ESPHome's built-in `mipi_rgb` component. The
-component tag must therefore be chosen for the ESPHome version used to compile
-the configuration.
+The external components shadow ESPHome's built-in components. The component tag
+must therefore be chosen for the ESPHome version used to compile the
+configuration. Consumers that do not use runtime image pools may list only
+`mipi_rgb`.
 
 ## Additional options
 
@@ -40,6 +40,14 @@ the configuration.
 See [`components/mipi_rgb/LICENSE`](components/mipi_rgb/LICENSE) for the precise
 changes from upstream.
 
+### `runtime_image`
+
+ESPHome 2026.9 retains a decoder object after each runtime image finishes. That
+is useful when one image is refreshed repeatedly, but a pool of many distinct
+images accumulates one decoder per loaded image. This override restores the
+2026.7 behavior of destroying the decoder after each success or error while
+keeping the decoded pixel buffer cached.
+
 ## Versioning
 
 Maintenance branches are named for the compatible ESPHome release series, such
@@ -54,7 +62,7 @@ firmware binary when rollback is required.
 ## Licensing
 
 ESPHome is split-licensed. The Python component files are MIT licensed and the
-C++ component files are GPL-3.0-or-later. SPDX headers identify each file's
-license, and the complete upstream license text is included in
+C++ component files are GPL-3.0-or-later. Component-specific license notices
+identify the modified files, and the complete upstream license text is included in
 [`LICENSES/ESPHome-LICENSE.txt`](LICENSES/ESPHome-LICENSE.txt). The repository's
 own documentation is covered by the root MIT license.

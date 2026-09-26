@@ -1,0 +1,20 @@
+This directory is NOT covered by the MIT license in the repository root.
+
+It is a modified copy of the `runtime_image` component from ESPHome 2026.9.0
+(https://github.com/esphome/esphome), Copyright (c) 2019 ESPHome, and it keeps
+ESPHome's split licensing:
+
+  *.cpp, *.h                       GPL-3.0-or-later
+  *.py                             MIT
+
+The full upstream license text is in ../../LICENSES/ESPHome-LICENSE.txt.
+
+Modification vs upstream:
+
+  `RuntimeImage::end_decode()` and `RuntimeImage::release()` destroy the decoder
+  object instead of retaining it for reuse. This restores ESPHome 2026.7.4's
+  decoder lifetime while preserving the completed image buffer. It prevents a
+  pool of distinct RuntimeImage instances from retaining one decoder per cached
+  image.
+
+Everything else is unchanged.
