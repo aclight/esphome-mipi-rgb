@@ -1,0 +1,272 @@
+# Minimal reproduction for esphome/esphome#19726.
+#
+# Twelve distinct online_image instances decode the same JPEG serially. The
+# image content and network requests are therefore controlled; only the number
+# of RuntimeImage/JpegDecoder instances grows. On ESPHome 2026.9.0, each
+# completed instance retains its approximately 17.9 kB JPEG decoder.
+#
+# This example targets an ESP32-S3 DevKitC with octal PSRAM. Adjust only the
+# board and psram blocks when using another PSRAM-equipped ESP32 board.
+
+substitutions:
+  wifi_ssid: "CHANGE_ME"
+  wifi_password: "CHANGE_ME"
+  test_image_url: "https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/03c9a9d795c08ab06d625e5fc3bf0ae8b26f9652/testimages/testorig.jpg"
+
+esphome:
+  name: runtime-image-retention-repro
+  min_version: 2026.9.0
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+wifi:
+  ssid: ${wifi_ssid}
+  password: ${wifi_password}
+  on_connect:
+    - script.execute: fetch_next_image
+
+logger:
+  level: DEBUG
+  logs:
+    online_image: DEBUG
+    http_request: DEBUG
+
+http_request:
+  timeout: 10s
+  watchdog_timeout: 15s
+
+# The image component requires a display component at configuration time. A
+# TM1637 has no framebuffer and need not be physically connected for this test.
+display:
+  - platform: tm1637
+    clk_pin: GPIO8
+    dio_pin: GPIO9
+    length: 4
+    update_interval: never
+
+globals:
+  - id: next_image_index
+    type: uint8_t
+    restore_value: false
+    initial_value: "0"
+
+script:
+  - id: fetch_next_image
+    mode: single
+    then:
+      # This snapshot runs directly from on_download_finished, after decoding
+      # ends but before all request callback state necessarily unwinds.
+      - lambda: |-
+          const uint8_t next_index = id(next_image_index);
+          if (next_index == 0) {
+            ESP_LOGI("decoder_repro",
+                     "Baseline: internal=%u B largest=%u B, psram=%u B largest=%u B",
+                     static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                     static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                     static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)),
+                     static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)));
+          } else {
+            ESP_LOGI("decoder_repro",
+                     "Image %u complete: internal=%u B largest=%u B, psram=%u B largest=%u B",
+                     static_cast<unsigned>(next_index - 1),
+                     static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                     static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                     static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)),
+                     static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)));
+          }
+      # Keep network/decode sessions strictly non-overlapping and allow HTTP
+      # request resources from the completed image to be reclaimed.
+      - delay: 500ms
+      - lambda: |-
+          const uint8_t next_index = id(next_image_index);
+          if (next_index >= 12) {
+            ESP_LOGI("decoder_repro",
+                     "All images complete: internal=%u B largest=%u B, psram=%u B largest=%u B",
+                     static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                     static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                     static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)),
+                     static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)));
+            return;
+          }
+
+          ESP_LOGI("decoder_repro",
+                   "Starting image %u: internal=%u B largest=%u B, psram=%u B largest=%u B",
+                   static_cast<unsigned>(next_index),
+                   static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                   static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                   static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)),
+                   static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)));
+
+          switch (next_index) {
+            case 0:
+              id(repro_image_00).update();
+              break;
+            case 1:
+              id(repro_image_01).update();
+              break;
+            case 2:
+              id(repro_image_02).update();
+              break;
+            case 3:
+              id(repro_image_03).update();
+              break;
+            case 4:
+              id(repro_image_04).update();
+              break;
+            case 5:
+              id(repro_image_05).update();
+              break;
+            case 6:
+              id(repro_image_06).update();
+              break;
+            case 7:
+              id(repro_image_07).update();
+              break;
+            case 8:
+              id(repro_image_08).update();
+              break;
+            case 9:
+              id(repro_image_09).update();
+              break;
+            case 10:
+              id(repro_image_10).update();
+              break;
+            case 11:
+              id(repro_image_11).update();
+              break;
+          }
+          id(next_image_index) = next_index + 1;
+
+image:
+  - platform: online_image
+    id: repro_image_00
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: &fetch_next
+      - script.execute: fetch_next_image
+    on_error: &fetch_error
+      - lambda: |-
+          ESP_LOGE("decoder_repro", "Image %u failed; stopping sequence",
+                   static_cast<unsigned>(id(next_image_index) - 1));
+
+  - platform: online_image
+    id: repro_image_01
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_02
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_03
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_04
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_05
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_06
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_07
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_08
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_09
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_10
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_11
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
