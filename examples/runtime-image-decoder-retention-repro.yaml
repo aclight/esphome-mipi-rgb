@@ -4,6 +4,8 @@
 # image content and network requests are therefore controlled; only the number
 # of RuntimeImage/JpegDecoder instances grows. On ESPHome 2026.9.0, each
 # completed instance retains its approximately 17.9 kB JPEG decoder.
+# Images are decoded for memory measurement only and are not rendered, so a
+# connected display remains blank during the test.
 #
 # This example targets an ESP32-S3 DevKitC with octal PSRAM. Adjust only the
 # board and psram blocks when using another PSRAM-equipped ESP32 board.
@@ -34,6 +36,8 @@ wifi:
   ssid: ${wifi_ssid}
   password: ${wifi_password}
   on_connect:
+    # Give API log streaming time to connect before the baseline is recorded.
+    - delay: 5s
     - script.execute: fetch_next_image
 
 logger:
