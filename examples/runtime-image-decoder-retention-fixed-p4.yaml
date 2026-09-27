@@ -1,0 +1,18 @@
+# Control configuration for esphome/esphome#19726. This runs the same 24-image
+# workload as runtime-image-decoder-retention-repro-p4.yaml while replacing only
+# ESPHome's runtime_image component with the decoder-release implementation.
+
+packages:
+  runtime_image_repro: !include runtime-image-decoder-retention-repro-p4.yaml
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/aclight/esphome-mipi-rgb.git
+      ref: esphome-2026.9.0-r2
+      path: components
+    components: [runtime_image]
+    refresh: 0s
+
+esphome:
+  name: runtime-image-fixed-p4

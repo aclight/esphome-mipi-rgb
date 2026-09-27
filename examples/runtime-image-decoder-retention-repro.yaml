@@ -1,6 +1,6 @@
 # Minimal reproduction for esphome/esphome#19726.
 #
-# Twelve distinct online_image instances decode the same JPEG serially. The
+# Twenty-four distinct online_image instances decode the same JPEG serially. The
 # image content and network requests are therefore controlled; only the number
 # of RuntimeImage/JpegDecoder instances grows. On ESPHome 2026.9.0, each
 # completed instance retains its approximately 17.9 kB JPEG decoder.
@@ -94,7 +94,7 @@ script:
       - delay: 500ms
       - lambda: |-
           const uint8_t next_index = id(next_image_index);
-          if (next_index >= 12) {
+          if (next_index >= 24) {
             ESP_LOGI("decoder_repro",
                      "All images complete: internal=%u B largest=%u B, psram=%u B largest=%u B",
                      static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
@@ -148,6 +148,42 @@ script:
               break;
             case 11:
               id(repro_image_11).update();
+              break;
+            case 12:
+              id(repro_image_12).update();
+              break;
+            case 13:
+              id(repro_image_13).update();
+              break;
+            case 14:
+              id(repro_image_14).update();
+              break;
+            case 15:
+              id(repro_image_15).update();
+              break;
+            case 16:
+              id(repro_image_16).update();
+              break;
+            case 17:
+              id(repro_image_17).update();
+              break;
+            case 18:
+              id(repro_image_18).update();
+              break;
+            case 19:
+              id(repro_image_19).update();
+              break;
+            case 20:
+              id(repro_image_20).update();
+              break;
+            case 21:
+              id(repro_image_21).update();
+              break;
+            case 22:
+              id(repro_image_22).update();
+              break;
+            case 23:
+              id(repro_image_23).update();
               break;
           }
           id(next_image_index) = next_index + 1;
@@ -269,6 +305,126 @@ image:
 
   - platform: online_image
     id: repro_image_11
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_12
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_13
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_14
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_15
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_16
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_17
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_18
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_19
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_20
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_21
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_22
+    url: ${test_image_url}
+    format: JPEG
+    type: RGB565
+    resize: 246x168
+    update_interval: never
+    on_download_finished: *fetch_next
+    on_error: *fetch_error
+
+  - platform: online_image
+    id: repro_image_23
     url: ${test_image_url}
     format: JPEG
     type: RGB565
