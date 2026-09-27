@@ -1,0 +1,58 @@
+# ESP32-P4/ESP32-C6 hosted-Wi-Fi wrapper for the Elecrow panel used to
+# reproduce esphome/esphome#19726.
+
+substitutions:
+  wifi_ssid: "CHANGE_ME"
+  wifi_password: "CHANGE_ME"
+  api_encryption_key: "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+  # GPIO8/9 carry RGB display data on this panel. These two pins are unused by
+  # the panel configuration and only satisfy ESPHome's display dependency.
+  dummy_display_clk_pin: GPIO47
+  dummy_display_dio_pin: GPIO48
+
+packages:
+  runtime_image_repro: !include runtime-image-decoder-retention-repro.yaml
+
+esphome:
+  name: runtime-image-retention-p4
+
+esp32:
+  board: esp32-p4
+  variant: esp32p4
+  engineering_sample: true
+  flash_size: 16MB
+  cpu_frequency: 360MHz
+  framework:
+    type: esp-idf
+    advanced:
+      execute_from_psram: true
+      enable_idf_experimental_features: true
+    sdkconfig_options:
+      CONFIG_ESP_MAIN_TASK_STACK_SIZE: "8192"
+
+psram:
+  mode: hex
+  speed: 200MHz
+
+esp32_hosted:
+  type: sdio
+  variant: ESP32C6
+  reset_pin: GPIO20
+  active_high: true
+  clk_pin: GPIO53
+  cmd_pin: GPIO54
+  d0_pin: GPIO52
+  d1_pin: GPIO51
+  d2_pin: GPIO50
+  d3_pin: GPIO49
+  bus_width: 4
+  slot: 1
+  sdio_frequency: 40MHz
+
+api:
+  encryption:
+    key: ${api_encryption_key}
+
+ota:
+  - platform: esphome
+    encryption:

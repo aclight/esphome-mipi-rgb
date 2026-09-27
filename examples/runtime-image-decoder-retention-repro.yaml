@@ -11,6 +11,8 @@
 substitutions:
   wifi_ssid: "CHANGE_ME"
   wifi_password: "CHANGE_ME"
+  dummy_display_clk_pin: GPIO8
+  dummy_display_dio_pin: GPIO9
   test_image_url: "https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/03c9a9d795c08ab06d625e5fc3bf0ae8b26f9652/testimages/testorig.jpg"
 
 esphome:
@@ -48,8 +50,8 @@ http_request:
 # TM1637 has no framebuffer and need not be physically connected for this test.
 display:
   - platform: tm1637
-    clk_pin: GPIO8
-    dio_pin: GPIO9
+    clk_pin: ${dummy_display_clk_pin}
+    dio_pin: ${dummy_display_dio_pin}
     length: 4
     update_interval: never
 
